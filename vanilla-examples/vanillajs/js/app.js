@@ -3,9 +3,11 @@
 
 	var todos = [],
 		stat = {},
-		ENTER_KEY = 13;
+		ENTER_KEY = 13,
+		db = null,
+		dbname = 'idb://todos';
 
-	window.addEventListener( 'load', windowLoadHandler, false );
+	window.addEventListener( 'load', loadPouch, false );
 
 	function Todo( title, completed ) {
 		this.id = getUuid();
@@ -17,6 +19,18 @@
 		this.todoLeft = 0;
 		this.todoCompleted = 0;
 		this.totalTodo = 0;
+	}
+
+	function loadPouch() {
+		//Pouch.destroy(dbname);
+		Pouch(dbname, function(err, pouchdb){
+			if(err){
+				alert('Can\'t open pouchdb database');
+			}else{
+				db = pouchdb;
+				windowLoadHandler();
+			}
+		});
 	}
 
 	function windowLoadHandler() {
@@ -41,7 +55,6 @@
 			}
 		} else {
 			removeTodoById( todoId );
-			refreshData();
 		}
 	}
 
@@ -68,7 +81,6 @@
 
 	function spanDeleteClickHandler( event ) {
 		removeTodoById( event.target.getAttribute('data-todo-id') );
-		refreshData();
 	}
 
 	function hrefClearClickHandler() {
@@ -90,7 +102,7 @@
 			todo = getTodoById( checkbox.getAttribute('data-todo-id') );
 
 		todo.completed = checkbox.checked;
-		refreshData();
+		saveEditChanges( todo.id );
 	}
 
 	function loadTodos() {
@@ -109,28 +121,68 @@
 			todos.push( todo );
 			refreshData();
 		}
+
+		db.post({_id: todo.id, title: todo.title, completed: todo.completed}, function(err, res){
+			if(!err){
+				console.log('Todo added');
+				refreshData();
+			}else{
+				console.log('Add failed');
+			}
+			console.log(err, res);
+		});
 	}
 
 	function editTodo( todoId, text ) {
-		var i, l;
+		var i, l, newTodo;
 
 		for ( i = 0, l = todos.length; i < l; i++ ) {
 			if ( todos[ i ].id === todoId ) {
+				newTodo = todos[ i ];
 				todos[ i ].title = text;
 			}
 		}
 
-		refreshData();
+		saveEditChanges( todoId );
+	}
+	
+	function saveEditChanges( todoId ){
+		var newTodo = getTodoById( todoId );
+		db.get(todoId, function(err, todo){
+				todo.title = newTodo.title;
+				todo.completed = newTodo.completed;
+				db.put(todo, function(err, res){
+					if(!err){
+						console.log('Todo edited');
+						refreshData();
+					}else{
+						console.log('Edit failed');
+					}
+				});
+		});
 	}
 
 	function removeTodoById( id ) {
 		var i = todos.length;
+		var todo;
 
 		while ( i-- ) {
 			if ( todos[ i ].id === id ) {
+				todo = todos[ i ];
 				todos.splice( i, 1 );
 			}
 		}
+
+		db.get(todo.id, function(err, res){
+			db.remove(res, function(err, res){
+				if(!err){
+					console.log('Todo removed');
+					refreshData();
+				}else{
+					console.log('Remove failed');
+				}
+			});
+		});
 	}
 
 	function removeTodosCompleted() {
@@ -157,7 +209,25 @@
 	function refreshData() {
 		saveTodos();
 		computeStats();
-		redrawTodosUI();
+
+		
+		db.allDocs({include_docs: true}, function(err, res){
+			var i;
+			var todo;
+			if(!err){
+				var todos = [];
+				for(i = 0; i < res.rows.length; i++){
+					todo = res.rows[i].doc;
+					todo.id = todo._id;
+					todos.push(todo);
+				}
+				console.log('all todos data', todos);
+				redrawTodosUI(todos);
+			}else{
+				console.log('Error getting all docs');
+			}
+		});
+
 		redrawStatsUI();
 		changeToggleAllCheckboxState();
 	}
@@ -182,7 +252,7 @@
 	}
 
 
-	function redrawTodosUI() {
+	function redrawTodosUI(todos) {
 
 		var todo, checkbox, label, deleteLink, divDisplay, inputEditTodo, li, i, l,
 			ul = document.getElementById('todo-list');
