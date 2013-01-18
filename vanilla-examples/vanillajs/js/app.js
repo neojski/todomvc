@@ -5,7 +5,8 @@
 		stat = {},
 		ENTER_KEY = 13,
 		db = null,
-		dbname = 'idb://todos';
+		dbname = 'idb://todos',
+		todos = {};
 
 	window.addEventListener( 'load', loadPouch, false );
 
@@ -140,53 +141,32 @@
 		});
 	}
 
-	function removeTodoById( id ) {
-		var i = todos.length;
-		var todo;
-
-		while ( i-- ) {
-			if ( todos[ i ].id === id ) {
-				todo = todos[ i ];
-				todos.splice( i, 1 );
-			}
-		}
-
-		db.get(todo.id, function(err, res){
-				db.remove(res, function(err, res){
-					if(!err){
+	function removeTodoById( todoId ) {
+		db.get(todoId, function(err, res){
+			db.remove(res, function(err, res){
+				if(!err){
 					console.log('Todo removed');
 					refreshData();
-					}else{
+				}else{
 					console.log('Remove failed');
-					}
-					});
-				});
+				}
+			});
+		});
 	}
 
 	function removeTodosCompleted() {
-		var i = todos.length;
-
-		while ( i-- ) {
-			console.log(i);
-			if ( todos[ i ].completed ) {
-				todos.splice( i, 1 );
+		getAllTodos(function(todos){
+			var i, todo;
+			for(i = 0; i < todos.length; i++){
+				var todo = todos[i];
+				if(todo.completed){
+					removeTodoById(todo.id);
+				}
 			}
-		}
+		});
 	}
 
-	function getTodoById( id ) {
-		var i, l;
-
-		for ( i = 0, l = todos.length; i < l; i++ ) {
-			if ( todos[ i ].id === id ) {
-				return todos[ i ];
-			}
-		}
-	}
-
-	function refreshData() {
-		computeStats();
-
+	function getAllTodos(callback){
 		db.allDocs({include_docs: true}, function(err, res){
 			var i;
 			var todo;
@@ -196,19 +176,28 @@
 					todo = res.rows[i].doc;
 					todo.id = todo._id;
 					todos.push(todo);
+
+					callback(todos);
 				}
-				console.log('all todos data', todos);
-				redrawTodosUI(todos);
 			}else{
 				console.log('Error getting all docs');
 			}
 		});
-
-		redrawStatsUI();
-		changeToggleAllCheckboxState();
 	}
 
-	function computeStats() {
+
+	function refreshData() {
+		getAllTodos(function(todos){
+			console.log('all todos data', todos);
+
+			computeStats(todos);
+			redrawTodosUI(todos);
+			redrawStatsUI(todos);
+			changeToggleAllCheckboxState(todos);
+		});
+	}
+
+	function computeStats(todos) {
 		var i, l;
 
 		stat = new Stat();
@@ -289,13 +278,13 @@
 		}
 	}
 
-	function changeToggleAllCheckboxState() {
+	function changeToggleAllCheckboxState(todos) {
 		var toggleAll = document.getElementById('toggle-all');
 
 		toggleAll.checked = stat.todoCompleted === todos.length;
 	}
 
-	function redrawStatsUI() {
+	function redrawStatsUI(todos) {
 		removeChildren( document.getElementsByTagName('footer')[0] );
 		document.getElementById('footer').style.display = todos.length ? 'block' : 'none';
 
