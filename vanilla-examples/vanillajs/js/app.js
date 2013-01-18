@@ -50,7 +50,7 @@
 
 		if ( trimmedText ) {
 			if ( event.keyCode === ENTER_KEY ) {
-				editTodo( todoId, trimmedText );
+				editTodo( todoId, {'title': trimmedText} );
 			}
 		} else {
 			removeTodoById( todoId );
@@ -61,7 +61,7 @@
 		var inputEditTodo = event.target,
 			todoId = event.target.id.slice( 6 );
 
-		editTodo( todoId, inputEditTodo.value );
+		editTodo( todoId, {'title': inputEditTodo.value} );
 	}
 
 	function newTodoKeyPressHandler( event ) {
@@ -98,10 +98,9 @@
 
 	function checkboxChangeHandler( event ) {
 		var checkbox = event.target,
-			todo = getTodoById( checkbox.getAttribute('data-todo-id') );
+			todoId = checkbox.getAttribute('data-todo-id');
 
-		todo.completed = checkbox.checked;
-		saveEditChanges( todo.id );
+		editTodo( todoId, {'completed': checkbox.checked} );
 	}
 
 	function addTodo( text ) {
@@ -109,8 +108,6 @@
 
 		if ( trimmedText ) {
 			var todo = new Todo( trimmedText, false );
-			todos.push( todo );
-			refreshData();
 		}
 
 		db.post({_id: todo.id, title: todo.title, completed: todo.completed}, function(err, res){
@@ -120,36 +117,26 @@
 			}else{
 				console.log('Add failed');
 			}
-			console.log(err, res);
 		});
 	}
 
-	function editTodo( todoId, text ) {
-		var i, l, newTodo;
-
-		for ( i = 0, l = todos.length; i < l; i++ ) {
-			if ( todos[ i ].id === todoId ) {
-				newTodo = todos[ i ];
-				todos[ i ].title = text;
-			}
-		}
-
-		saveEditChanges( todoId );
-	}
-	
-	function saveEditChanges( todoId ){
-		var newTodo = getTodoById( todoId );
+	/* opt: text, completed */
+	function editTodo( todoId, opt ) {
 		db.get(todoId, function(err, todo){
-				todo.title = newTodo.title;
-				todo.completed = newTodo.completed;
-				db.put(todo, function(err, res){
-					if(!err){
-						console.log('Todo edited');
-						refreshData();
-					}else{
-						console.log('Edit failed');
-					}
-				});
+			if('title' in opt){
+				todo.title = opt.title;
+			}
+			if('completed' in opt){
+				todo.completed = opt.completed;
+			}
+			db.put(todo, function(err, res){
+				if(!err){
+					console.log('Todo edited', opt);
+					refreshData();
+				}else{
+					console.log('Edit failed');
+				}
+			});
 		});
 	}
 
@@ -165,15 +152,15 @@
 		}
 
 		db.get(todo.id, function(err, res){
-			db.remove(res, function(err, res){
-				if(!err){
+				db.remove(res, function(err, res){
+					if(!err){
 					console.log('Todo removed');
 					refreshData();
-				}else{
+					}else{
 					console.log('Remove failed');
-				}
-			});
-		});
+					}
+					});
+				});
 	}
 
 	function removeTodosCompleted() {
@@ -184,7 +171,7 @@
 			if ( todos[ i ].completed ) {
 				todos.splice( i, 1 );
 			}
-	   }
+		}
 	}
 
 	function getTodoById( id ) {
@@ -199,7 +186,7 @@
 
 	function refreshData() {
 		computeStats();
-		
+
 		db.allDocs({include_docs: true}, function(err, res){
 			var i;
 			var todo;
@@ -238,9 +225,8 @@
 
 
 	function redrawTodosUI(todos) {
-
 		var todo, checkbox, label, deleteLink, divDisplay, inputEditTodo, li, i, l,
-			ul = document.getElementById('todo-list');
+				ul = document.getElementById('todo-list');
 
 		document.getElementById('main').style.display = todos.length ? 'block' : 'none';
 
@@ -324,8 +310,8 @@
 
 	function drawTodoCount() {
 		var number = document.createElement('strong'),
-			remaining = document.createElement('span'),
-			text = ' ' + ( stat.todoLeft === 1 ? 'item' : 'items' ) + ' left';
+				remaining = document.createElement('span'),
+				text = ' ' + ( stat.todoLeft === 1 ? 'item' : 'items' ) + ' left';
 
 		// create remaining count
 		number.innerHTML = stat.todoLeft;
@@ -344,24 +330,24 @@
 		buttonClear.addEventListener( 'click', hrefClearClickHandler );
 		buttonClear.innerHTML = 'Clear completed (' + stat.todoCompleted + ')';
 
-		document.getElementsByTagName('footer')[0].appendChild( buttonClear );
-	}
+				document.getElementsByTagName('footer')[0].appendChild( buttonClear );
+				}
 
-	function removeChildren( node ) {
-		node.innerHTML = '';
-	}
+				function removeChildren( node ) {
+				node.innerHTML = '';
+				}
 
-	function getUuid() {
-		var i, random,
-			uuid = '';
+				function getUuid() {
+				var i, random,
+				uuid = '';
 
-		for ( i = 0; i < 32; i++ ) {
-			random = Math.random() * 16 | 0;
-			if ( i === 8 || i === 12 || i === 16 || i === 20 ) {
+				for ( i = 0; i < 32; i++ ) {
+				random = Math.random() * 16 | 0;
+				if ( i === 8 || i === 12 || i === 16 || i === 20 ) {
 				uuid += '-';
-			}
-			uuid += ( i === 12 ? 4 : (i === 16 ? (random & 3 | 8) : random) ).toString( 16 );
-		}
-		return uuid;
-	}
+				}
+				uuid += ( i === 12 ? 4 : (i === 16 ? (random & 3 | 8) : random) ).toString( 16 );
+				}
+				return uuid;
+				}
 })();
