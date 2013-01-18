@@ -34,7 +34,6 @@
 	}
 
 	function windowLoadHandler() {
-		loadTodos();
 		refreshData();
 		addEventListeners();
 	}
@@ -103,14 +102,6 @@
 
 		todo.completed = checkbox.checked;
 		saveEditChanges( todo.id );
-	}
-
-	function loadTodos() {
-		if ( !localStorage.getItem('todos-vanillajs') ) {
-			localStorage.setItem( 'todos-vanillajs', JSON.stringify([]) );
-		}
-
-		todos = JSON.parse( localStorage.getItem('todos-vanillajs') );
 	}
 
 	function addTodo( text ) {
@@ -207,9 +198,7 @@
 	}
 
 	function refreshData() {
-		saveTodos();
 		computeStats();
-
 		
 		db.allDocs({include_docs: true}, function(err, res){
 			var i;
@@ -230,10 +219,6 @@
 
 		redrawStatsUI();
 		changeToggleAllCheckboxState();
-	}
-
-	function saveTodos() {
-		localStorage.setItem( 'todos-vanillajs', JSON.stringify( todos ) );
 	}
 
 	function computeStats() {
