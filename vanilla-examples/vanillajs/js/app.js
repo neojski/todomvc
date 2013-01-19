@@ -8,12 +8,15 @@
 		dbname = 'idb://todos',
 		todos = {};
 
+		//dbname = 'http://127.0.0.1:5984/todos';
+
 	window.addEventListener( 'load', loadPouch, false );
 
 	function Todo( title, completed ) {
-		this.id = getUuid();
+		this._id = getUuid();
 		this.title = title;
 		this.completed = completed;
+		this.created = Date.now();
 	}
 
 	function Stat() {
@@ -26,16 +29,62 @@
 		//Pouch.destroy(dbname);
 		Pouch(dbname, function(err, pouchdb){
 			if(err){
+				console.log(err);
 				alert('Can\'t open pouchdb database');
 			}else{
+				document.getElementById('push').addEventListener('click', function(){
+					var orig = this.innerHTML;
+					var that = this;
+					this.innerHTML = "working";
+					Pouch.replicate(dbname, 'http://127.0.0.1:2020/todos', function(err, changes){
+						if(!err){
+							alert('Sync finished');
+						}else{
+							alert('Sync failed');
+						}
+						that.innerHTML = orig;
+					});
+				}, false);
+
+
+				document.getElementById('get').addEventListener('click', function(){
+					var orig = this.innerHTML;
+					var that = this;
+					this.innerHTML = "working";
+					Pouch.replicate('http://127.0.0.1:2020/todos', dbname, function(err, changes){
+						if(!err){
+							loadData();
+						}else{
+							console.log('Replication get error');
+						}
+						that.innerHTML = orig;
+					});
+				}, false);
+				
 				db = pouchdb;
 				windowLoadHandler();
 			}
 		});
 	}
 
+	function loadData(){
+		db.allDocs({include_docs: true}, function(err, res){
+			var i, todo;
+			if(!err){
+				todos = {};
+				for(i = 0; i < res.rows.length; i++){
+					todo = res.rows[i].doc;
+					todos[todo._id] = todo;
+				}
+				refreshData();
+			}else{
+				console.log('Error getting all docs');
+			}
+		});
+	}
+
 	function windowLoadHandler() {
-		refreshData();
+		loadData();
 		addEventListeners();
 	}
 
@@ -72,13 +121,13 @@
 	}
 
 	function toggleAllChangeHandler( event ) {
-		getAllTodos(function(todos){
-			var i, todo;
-			for(i = 0; i < todos.length; i++){
+		var i, todo;
+		for(i in todos){
+			if(todos.hasOwnProperty(i)){
 				var todo = todos[i];
-				editTodo(todo.id, {'completed': event.target.checked});
+				editTodo(todo._id, {'completed': event.target.checked});
 			}
-		});
+		}
 	}
 
 	function spanDeleteClickHandler( event ) {
@@ -112,12 +161,14 @@
 			var todo = new Todo( trimmedText, false );
 		}
 
-		db.post({_id: todo.id, title: todo.title, completed: todo.completed, created: Date.now()}, function(err, res){
+		db.post(todo, function(err, res){
 			if(!err){
-				console.log('Todo added');
+				console.log('Todo added', todo._id);
+				todos[todo._id] = todo;
+				console.log(todo)
 				refreshData();
 			}else{
-				console.log('Add failed');
+				console.log('Add failed', err);
 			}
 		});
 	}
@@ -125,6 +176,7 @@
 	/* opt: text, completed */
 	function editTodo( todoId, opt ) {
 		db.get(todoId, function(err, todo){
+			console.log(todo);
 			if('title' in opt){
 				todo.title = opt.title;
 			}
@@ -134,6 +186,7 @@
 			db.put(todo, function(err, res){
 				if(!err){
 					console.log('Todo edited', opt);
+					todos[todoId] = todo;
 					refreshData();
 				}else{
 					console.log('Edit failed');
@@ -147,6 +200,7 @@
 			db.remove(res, function(err, res){
 				if(!err){
 					console.log('Todo removed');
+					delete todos[todoId];
 					refreshData();
 				}else{
 					console.log('Remove failed');
@@ -156,48 +210,33 @@
 	}
 
 	function removeTodosCompleted() {
-		getAllTodos(function(todos){
-			var i, todo;
-			for(i = 0; i < todos.length; i++){
+		var i, todo;
+		for(i in todos){
+			if(todos.hasOwnProperty(i)){
 				var todo = todos[i];
 				if(todo.completed){
-					removeTodoById(todo.id);
+					removeTodoById(todo._id);
 				}
 			}
-		});
-	}
-
-	function getAllTodos(callback){
-		db.allDocs({include_docs: true}, function(err, res){
-			var i;
-			var todo;
-			if(!err){
-				var todos = [];
-				for(i = 0; i < res.rows.length; i++){
-					todo = res.rows[i].doc;
-					todo.id = todo._id;
-					todos.push(todo);
-				}
-				callback(todos);
-			}else{
-				console.log('Error getting all docs');
-			}
-		});
+		}
 	}
 
 	function refreshData() {
-		getAllTodos(function(todos){
-			console.log('all todos data', todos);
-
-			todos.sort(function(a, b){
-				return -1 * (a.created - b.created);
-			});
-
-			computeStats(todos);
-			redrawTodosUI(todos);
-			redrawStatsUI(todos);
-			changeToggleAllCheckboxState(todos);
+		var todosArr = [];
+		var i, todo;
+		for(i in todos){
+			if(todos.hasOwnProperty(i)){
+				todo = todos[i];
+				todosArr.push(todo);
+			}
+		}
+		todosArr.sort(function(a, b){
+			return a.created - b.created;
 		});
+		computeStats(todosArr);
+		redrawTodosUI(todosArr);
+		redrawStatsUI(todosArr);
+		changeToggleAllCheckboxState(todosArr);
 	}
 
 	function computeStats(todos) {
@@ -231,13 +270,13 @@
 			// create checkbox
 			checkbox = document.createElement('input');
 			checkbox.className = 'toggle';
-			checkbox.setAttribute( 'data-todo-id', todo.id );
+			checkbox.setAttribute( 'data-todo-id', todo._id );
 			checkbox.type = 'checkbox';
 			checkbox.addEventListener( 'change', checkboxChangeHandler );
 
 			// create div text
 			label = document.createElement('label');
-			label.setAttribute( 'data-todo-id', todo.id );
+			label.setAttribute( 'data-todo-id', todo._id );
 			label.appendChild( document.createTextNode( todo.title ) );
 			label.addEventListener( 'dblclick', todoContentHandler );
 
@@ -245,13 +284,13 @@
 			// create delete button
 			deleteLink = document.createElement('button');
 			deleteLink.className = 'destroy';
-			deleteLink.setAttribute( 'data-todo-id', todo.id );
+			deleteLink.setAttribute( 'data-todo-id', todo._id );
 			deleteLink.addEventListener( 'click', spanDeleteClickHandler );
 
 			// create divDisplay
 			divDisplay = document.createElement('div');
 			divDisplay.className = 'view';
-			divDisplay.setAttribute( 'data-todo-id', todo.id );
+			divDisplay.setAttribute( 'data-todo-id', todo._id );
 			divDisplay.appendChild( checkbox );
 			divDisplay.appendChild( label );
 			divDisplay.appendChild( deleteLink );
@@ -267,7 +306,7 @@
 
 			// create li
 			li = document.createElement('li');
-			li.id = 'li_' + todo.id;
+			li.id = 'li_' + todo._id;
 			li.appendChild( divDisplay );
 			li.appendChild( inputEditTodo );
 
