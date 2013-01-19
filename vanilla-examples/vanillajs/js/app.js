@@ -72,6 +72,16 @@
 	}
 
 	function toggleAllChangeHandler( event ) {
+		getAllTodos(function(todos){
+			var i, todo;
+			for(i = 0; i < todos.length; i++){
+				var todo = todos[i];
+				if(todo.completed){
+					removeTodoById(todo.id);
+				}
+			}
+		});
+
 		for ( var i in todos ) {
 			todos[ i ].completed = event.target.checked;
 		}
@@ -111,7 +121,7 @@
 			var todo = new Todo( trimmedText, false );
 		}
 
-		db.post({_id: todo.id, title: todo.title, completed: todo.completed}, function(err, res){
+		db.post({_id: todo.id, title: todo.title, completed: todo.completed, created: Date.now()}, function(err, res){
 			if(!err){
 				console.log('Todo added');
 				refreshData();
@@ -130,6 +140,7 @@
 			if('completed' in opt){
 				todo.completed = opt.completed;
 			}
+			todo.created = Date.now();
 			db.put(todo, function(err, res){
 				if(!err){
 					console.log('Todo edited', opt);
@@ -176,19 +187,21 @@
 					todo = res.rows[i].doc;
 					todo.id = todo._id;
 					todos.push(todo);
-
-					callback(todos);
 				}
+				callback(todos);
 			}else{
 				console.log('Error getting all docs');
 			}
 		});
 	}
 
-
 	function refreshData() {
 		getAllTodos(function(todos){
 			console.log('all todos data', todos);
+
+			todos.sort(function(a, b){
+				return -1 * (a.created - b.created);
+			});
 
 			computeStats(todos);
 			redrawTodosUI(todos);
