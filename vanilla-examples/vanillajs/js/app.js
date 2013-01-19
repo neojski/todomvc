@@ -46,7 +46,6 @@
 					});
 				}, false);
 
-
 				document.getElementById('get').addEventListener('click', function(){
 					var orig = this.innerHTML;
 					var that = this;
