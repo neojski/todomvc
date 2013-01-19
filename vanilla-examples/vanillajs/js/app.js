@@ -5,10 +5,9 @@
 		stat = {},
 		ENTER_KEY = 13,
 		db = null,
+		todos = {},
 		dbname = 'idb://todos',
-		todos = {};
-
-		//dbname = 'http://127.0.0.1:5984/todos';
+		remote = 'http://127.0.0.1:2020/todos';
 
 	window.addEventListener( 'load', loadPouch, false );
 
@@ -29,20 +28,21 @@
 		//Pouch.destroy(dbname);
 		Pouch(dbname, function(err, pouchdb){
 			if(err){
-				console.log(err);
 				alert('Can\'t open pouchdb database');
 			}else{
 				document.getElementById('push').addEventListener('click', function(){
 					var orig = this.innerHTML;
 					var that = this;
 					this.innerHTML = "working";
-					Pouch.replicate(dbname, 'http://127.0.0.1:2020/todos', function(err, changes){
+					Pouch.replicate(dbname, remote, function(err, changes){
 						if(!err){
-							alert('Sync finished');
+							that.innerHTML = "synced";
 						}else{
-							alert('Sync failed');
+							that.innerHTML = "failed";
 						}
-						that.innerHTML = orig;
+						setTimeout(function(){
+							that.innerHTML = orig;
+						}, 1000);
 					});
 				}, false);
 
@@ -51,7 +51,7 @@
 					var orig = this.innerHTML;
 					var that = this;
 					this.innerHTML = "working";
-					Pouch.replicate('http://127.0.0.1:2020/todos', dbname, function(err, changes){
+					Pouch.replicate(remote, dbname, function(err, changes){
 						if(!err){
 							loadData();
 						}else{
@@ -175,6 +175,7 @@
 
 	/* opt: text, completed */
 	function editTodo( todoId, opt ) {
+
 		db.get(todoId, function(err, todo){
 			console.log(todo);
 			if('title' in opt){
@@ -297,7 +298,7 @@
 
 			// create todo input
 			inputEditTodo = document.createElement('input');
-			inputEditTodo.id = 'input_' + todo.id;
+			inputEditTodo.id = 'input_' + todo._id;
 			inputEditTodo.className = 'edit';
 			inputEditTodo.value = todo.title;
 			inputEditTodo.addEventListener( 'keypress', inputEditTodoKeyPressHandler );
