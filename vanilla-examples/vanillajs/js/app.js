@@ -76,17 +76,9 @@
 			var i, todo;
 			for(i = 0; i < todos.length; i++){
 				var todo = todos[i];
-				if(todo.completed){
-					removeTodoById(todo.id);
-				}
+				editTodo(todo.id, {'completed': event.target.checked});
 			}
 		});
-
-		for ( var i in todos ) {
-			todos[ i ].completed = event.target.checked;
-		}
-
-		refreshData();
 	}
 
 	function spanDeleteClickHandler( event ) {
