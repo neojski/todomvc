@@ -102,7 +102,6 @@
 	function checkboxChangeHandler( event ) {
 		var checkbox = event.target,
 			todoId = checkbox.getAttribute('data-todo-id');
-
 		editTodo( todoId, {'completed': checkbox.checked} );
 	}
 
@@ -132,7 +131,6 @@
 			if('completed' in opt){
 				todo.completed = opt.completed;
 			}
-			todo.created = Date.now();
 			db.put(todo, function(err, res){
 				if(!err){
 					console.log('Todo edited', opt);
@@ -324,24 +322,24 @@
 		buttonClear.addEventListener( 'click', hrefClearClickHandler );
 		buttonClear.innerHTML = 'Clear completed (' + stat.todoCompleted + ')';
 
-				document.getElementsByTagName('footer')[0].appendChild( buttonClear );
-				}
+		document.getElementsByTagName('footer')[0].appendChild( buttonClear );
+	}
 
-				function removeChildren( node ) {
-				node.innerHTML = '';
-				}
+	function removeChildren( node ) {
+		node.innerHTML = '';
+	}
 
-				function getUuid() {
-				var i, random,
-				uuid = '';
+	function getUuid() {
+		var i, random,
+		uuid = '';
 
-				for ( i = 0; i < 32; i++ ) {
-				random = Math.random() * 16 | 0;
-				if ( i === 8 || i === 12 || i === 16 || i === 20 ) {
+		for ( i = 0; i < 32; i++ ) {
+			random = Math.random() * 16 | 0;
+			if ( i === 8 || i === 12 || i === 16 || i === 20 ) {
 				uuid += '-';
-				}
-				uuid += ( i === 12 ? 4 : (i === 16 ? (random & 3 | 8) : random) ).toString( 16 );
-				}
-				return uuid;
-				}
+			}
+			uuid += ( i === 12 ? 4 : (i === 16 ? (random & 3 | 8) : random) ).toString( 16 );
+			}
+		return uuid;
+	}
 })();
